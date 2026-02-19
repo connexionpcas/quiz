@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>QuizBuzz — Live Quiz Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#08080f;--surface:#0f0f1c;--card:#141421;--card2:#1a1a2a;
+  --b1:#1e1e35;--b2:#28284a;
+  --yellow:#e8ff00;--cyan:#00ffb3;--red:#ff2d55;--orange:#ff6b00;
+  --text:#eeeeff;--muted:#585880;--dim:#252540;
+  --fd:'Bebas Neue',sans-serif;--fm:'Space Mono',monospace;--fb:'DM Sans',sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--fb);font-size:15px;line-height:1.5;overflow-x:hidden}
+
+/* BG DECORATION */
+.bg-wrap{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.bg-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(232,255,0,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(232,255,0,.02) 1px,transparent 1px);background-size:54px 54px}
+.bg-glow{position:absolute;border-radius:50%;filter:blur(120px);opacity:.12}
+.glow-a{width:700px;height:700px;top:-300px;left:-200px;background:var(--yellow)}
+.glow-b{width:600px;height:600px;bottom:-250px;right:-150px;background:var(--cyan)}
+
+/* SCREENS */
+.scr{display:none;min-height:100vh;flex-direction:column;position:relative;z-index:1}
+.scr.on{display:flex;animation:rise .28s ease}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 22px;border:none;border-radius:8px;font-family:var(--fb);font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.3px;white-space:nowrap;outline:none}
+.btn:disabled{opacity:.3;cursor:not-allowed!important;transform:none!important;box-shadow:none!important}
+.by{background:var(--yellow);color:#08080f}
+.by:hover:not(:disabled){background:#f0ff30;transform:translateY(-2px);box-shadow:0 8px 24px rgba(232,255,0,.3)}
+.bc{background:var(--cyan);color:#08080f}
+.bc:hover:not(:disabled){background:#30ffc0;transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,255,179,.3)}
+.br{background:var(--red);color:#fff}
+.br:hover:not(:disabled){background:#ff4d70;transform:translateY(-2px)}
+.bg2{background:transparent;color:var(--muted);border:1.5px solid var(--b2)}
+.bg2:hover{color:var(--text);border-color:var(--muted)}
+.sm{padding:7px 15px;font-size:12px}
+.full{width:100%;padding:13px;font-size:15px}
+
+/* INPUTS */
+input,textarea{background:var(--surface);border:1.5px solid var(--b2);color:var(--text);padding:11px 14px;border-radius:8px;font-family:var(--fb);font-size:14px;width:100%;outline:none;transition:border-color .15s,box-shadow .15s;resize:none}
+input:focus,textarea:focus{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(232,255,0,.07)}
+::placeholder{color:var(--muted)}
+
+/* CARD */
+.card{background:var(--card);border:1.5px solid var(--b1);border-radius:10px;padding:20px}
+.clbl{font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+
+/* TOAST */
+#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(14px);background:var(--card2);border:1.5px solid var(--b2);color:var(--text);padding:10px 22px;border-radius:8px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:all .22s;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.5);white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   LANDING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#pg-land{align-items:center;justify-content:center;padding:28px}
+.land-wrap{width:100%;max-width:860px;display:flex;flex-direction:column;align-items:center;gap:54px}
+.logo{text-align:center}
+.logo-bolt{font-size:52px;display:block;margin-bottom:2px}
+.logo-name{font-family:var(--fd);font-size:100px;letter-spacing:8px;line-height:1}
+.logo-name .hi{color:var(--yellow)}
+.logo-tag{margin-top:8px;font-family:var(--fm);font-size:12px;color:var(--muted);letter-spacing:3px}
+
+.role-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;width:100%}
+@media(max-width:600px){.role-grid{grid-template-columns:1fr}}
+
+.rcard{background:var(--card);border:1.5px solid var(--b2);border-radius:12px;padding:32px 28px;display:flex;flex-direction:column;gap:16px;cursor:default;transition:border-color .15s,transform .15s,box-shadow .15s}
+.rcard:hover{border-color:var(--yellow);transform:translateY(-4px);box-shadow:0 18px 44px rgba(0,0,0,.4)}
+.rcard-ico{font-size:36px}
+.rcard h2{font-size:22px;font-weight:700}
+.rcard p{color:var(--muted);font-size:14px;line-height:1.7}
+.join-fields{display:flex;flex-direction:column;gap:9px}
+#jcode{font-family:var(--fm);text-transform:uppercase;letter-spacing:6px;text-align:center;font-size:18px;font-weight:700}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   HOST SETUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#pg-setup{align-items:center;justify-content:center;padding:28px}
+.sbox{width:100%;max-width:440px;background:var(--card);border:1.5px solid var(--b2);border-radius:12px;padding:40px 36px;display:flex;flex-direction:column;gap:26px}
+.stitle{font-family:var(--fd);font-size:44px;letter-spacing:3px;color:var(--yellow)}
+.flabel{font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:block}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TOP BAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 24px;height:58px;background:var(--surface);border-bottom:1.5px solid var(--b2);position:sticky;top:0;z-index:100;flex-shrink:0}
+.tbrand{font-family:var(--fd);font-size:22px;letter-spacing:4px;color:var(--yellow)}
+.troom{display:flex;align-items:center;gap:9px;font-family:var(--fm);font-size:11px;color:var(--muted)}
+.rchip{font-size:18px;font-weight:700;color:var(--cyan);letter-spacing:4px}
+.cbtn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:17px;padding:4px;transition:color .15s}
+.cbtn:hover{color:var(--yellow)}
+.tright{display:flex;align-items:center;gap:8px}
+.sdisp{display:flex;align-items:center;gap:8px}
+.slbl{font-family:var(--fm);font-size:10px;letter-spacing:2px;color:var(--muted)}
+.sval{font-family:var(--fd);font-size:30px;color:var(--yellow);line-height:1}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   HOST DASHBOARD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#pg-host{min-height:100vh}
+.hbody{display:grid;grid-template-columns:350px 1fr;gap:18px;padding:20px 24px;align-items:start}
+@media(max-width:800px){.hbody{grid-template-columns:1fr}}
+.hleft,.hright{display:flex;flex-direction:column;gap:16px}
+
+/* Buzzer master */
+.bctrl{display:flex;flex-direction:column;align-items:center;gap:18px;padding:10px 0}
+.mbt{position:relative;width:150px;height:150px;border-radius:50%;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .2s}
+.mbt:hover{transform:scale(1.05)}
+.mring{position:absolute;inset:0;border-radius:50%;border:3px solid var(--dim);transition:all .3s}
+.mcore{position:relative;z-index:1;width:118px;height:118px;border-radius:50%;background:var(--surface);border:2px solid var(--b2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;transition:all .3s}
+.mico{font-size:30px}
+.mlbl{font-family:var(--fd);font-size:14px;letter-spacing:2px;color:var(--muted);transition:color .3s}
+.mbt.open .mring{border-color:var(--cyan);box-shadow:0 0 0 8px rgba(0,255,179,.08),0 0 50px rgba(0,255,179,.22);animation:mpulse 2s ease-in-out infinite}
+.mbt.open .mcore{background:#0a1e14;border-color:var(--cyan)}
+.mbt.open .mlbl{color:var(--cyan)}
+@keyframes mpulse{0%,100%{box-shadow:0 0 0 8px rgba(0,255,179,.08),0 0 50px rgba(0,255,179,.22)}50%{box-shadow:0 0 0 16px rgba(0,255,179,.03),0 0 70px rgba(0,255,179,.38)}}
+.lpill{display:inline-flex;align-items:center;gap:7px;font-family:var(--fm);font-size:11px;letter-spacing:1.5px;padding:6px 16px;border-radius:20px;background:var(--surface);border:1.5px solid var(--b2);color:var(--muted);transition:all .3s}
+.lpill.open{color:var(--cyan);border-color:var(--cyan);background:rgba(0,255,179,.05)}
+.ldot{width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0;transition:background .3s}
+.lpill.open .ldot{background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+
+/* Timer ring */
+.twrap{display:flex;justify-content:center;padding:4px 0}
+.tbox{position:relative;width:118px;height:118px;display:flex;align-items:center;justify-content:center}
+.tsvg{position:absolute;inset:0;transform:rotate(-90deg);width:100%;height:100%}
+.ttrack{fill:none;stroke:var(--b2);stroke-width:6}
+.tarc{fill:none;stroke:var(--yellow);stroke-width:6;stroke-linecap:round;stroke-dasharray:276.46;stroke-dashoffset:0;transition:stroke-dashoffset 1s linear,stroke .4s}
+.tarc.urg{stroke:var(--red)}
+.tnum{font-family:var(--fd);font-size:40px;position:relative;z-index:1}
+
+/* Player list */
+.plist{display:flex;flex-direction:column;gap:8px;min-height:68px}
+.empty{color:var(--muted);font-size:13px;font-style:italic;text-align:center;padding:16px 0}
+.prow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface);border:1.5px solid var(--b1);border-radius:8px;transition:border-color .15s}
+.prow.sc{border-color:var(--cyan)}.prow.sw{border-color:var(--red)}.prow.sbu{border-color:var(--orange)}.prow.sl{opacity:.4}
+.pav{width:34px;height:34px;border-radius:50%;background:var(--dim);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pinf{flex:1;min-width:0}
+.pnm{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.psc{font-family:var(--fm);font-size:11px;color:var(--muted)}
+.ptag{font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 9px;border-radius:20px;text-transform:uppercase;white-space:nowrap;flex-shrink:0}
+.tw{background:var(--b2);color:var(--muted)}
+.tb{background:var(--orange);color:#fff;animation:bk .8s infinite}
+.tok{background:var(--cyan);color:#08080f}
+.tx{background:var(--red);color:#fff}
+.tl{background:var(--muted);color:#fff}
+@keyframes bk{0%,100%{opacity:1}50%{opacity:.5}}
+.cbadge{display:inline-flex;align-items:center;justify-content:center;background:var(--yellow);color:#08080f;font-family:var(--fm);font-size:10px;font-weight:700;width:20px;height:20px;border-radius:50%;margin-left:6px}
+
+/* Log */
+.logbox{display:flex;flex-direction:column;gap:5px;max-height:200px;overflow-y:auto}
+.li{font-family:var(--fm);font-size:11px;padding:6px 10px;border-radius:4px;background:var(--surface);border-left:3px solid var(--b2);color:var(--muted)}
+.lw{border-color:var(--red);color:var(--red)}.li2{border-color:var(--yellow);color:var(--yellow)}.lg{border-color:var(--cyan);color:var(--cyan)}.la{border-color:var(--orange);color:var(--orange)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   PLAYER VIEW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#pg-player{min-height:100vh}
+.pbody{display:grid;grid-template-columns:1fr 260px;gap:18px;padding:20px 24px;align-items:start}
+@media(max-width:660px){.pbody{grid-template-columns:1fr}.pside{order:-1}}
+.pmain{display:flex;flex-direction:column;align-items:center;gap:20px}
+
+/* Status banner */
+.banner{width:100%;display:flex;align-items:center;gap:13px;padding:14px 20px;border-radius:10px;border:1.5px solid var(--b2);background:var(--card);font-weight:600;font-size:15px;transition:all .25s}
+.bn-ico{font-size:22px;flex-shrink:0}
+.bn-wait{border-color:var(--muted)}
+.bn-open{border-color:var(--yellow);background:rgba(232,255,0,.04);color:var(--yellow)}
+.bn-buzz{border-color:var(--orange);background:rgba(255,107,0,.06);color:var(--orange)}
+.bn-ok{border-color:var(--cyan);background:rgba(0,255,179,.06);color:var(--cyan)}
+.bn-bad{border-color:var(--red);background:rgba(255,45,85,.06);color:var(--red)}
+
+/* Buzz button */
+.buzzzone{display:flex;align-items:center;justify-content:center;padding:4px 0}
+.buzzbt{position:relative;width:210px;height:210px;border-radius:50%;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .14s}
+.buzzbt:not(:disabled):hover{transform:scale(1.04)}
+.buzzbt:not(:disabled):active{transform:scale(.96)}
+.buzzbt:disabled{cursor:not-allowed}
+.bring{position:absolute;inset:0;border-radius:50%;border:2px solid transparent;transition:all .3s}
+.bcore{position:relative;z-index:1;width:168px;height:168px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;transition:all .3s}
+.bico{font-size:42px}
+.blbl{font-family:var(--fd);font-size:22px;letter-spacing:4px}
+.bsub{font-family:var(--fm);font-size:10px;letter-spacing:1px;color:var(--muted)}
+/* locked */
+.bz-lock .bring{border-color:var(--b2)}
+.bz-lock .bcore{background:var(--surface);border:3px solid var(--b2);color:var(--muted)}
+/* ready */
+.bz-rdy .bring:first-child{border-color:var(--yellow);animation:rp 2s ease-in-out infinite}
+.bz-rdy .bring:last-child{inset:14px;border-color:rgba(232,255,0,.22);animation:rp 2s ease-in-out infinite .3s}
+.bz-rdy .bcore{background:#141400;border:3px solid var(--yellow);color:var(--yellow);box-shadow:0 0 50px rgba(232,255,0,.16)}
+.bz-rdy .bsub{color:var(--yellow)}
+/* buzzed */
+.bz-bz .bring:first-child{border-color:var(--orange);animation:bf .6s ease-in-out infinite}
+.bz-bz .bring:last-child{inset:14px;border-color:var(--orange);opacity:.4}
+.bz-bz .bcore{background:#140a00;border:3px solid var(--orange);color:var(--orange);box-shadow:0 0 50px rgba(255,107,0,.26)}
+@keyframes rp{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.08);opacity:.35}}
+@keyframes bf{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+
+/* Answer form */
+.aform{width:100%;background:var(--card);border:1.5px solid var(--b2);border-radius:10px;padding:22px;display:flex;flex-direction:column;gap:14px}
+.trow{display:flex;align-items:center;gap:10px;font-family:var(--fm);font-size:13px;color:var(--muted)}
+.tbig{font-size:26px;font-weight:700;color:var(--yellow);min-width:32px;text-align:center;transition:color .25s}
+.tbig.urg{color:var(--red);animation:bk .5s infinite}
+.onece{font-size:11px;color:var(--red);font-family:var(--fm);text-align:center}
+
+/* Result */
+.rescard{width:100%;background:var(--card);border:1.5px solid var(--b2);border-radius:10px;padding:36px 28px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.rescard.rok{border-color:var(--cyan);background:rgba(0,255,179,.03)}
+.rescard.rbad{border-color:var(--red);background:rgba(255,45,85,.03)}
+.rico{font-size:64px}
+.rlbl{font-family:var(--fd);font-size:36px;letter-spacing:3px}
+.rlbl.ok{color:var(--cyan)}.rlbl.bad{color:var(--red)}
+.rmsg{font-size:14px;color:var(--muted)}
+
+/* Leaderboard */
+.lbwrap{display:flex;flex-direction:column;gap:7px}
+.lbrow{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface);border:1.5px solid var(--b1);border-radius:7px;transition:border-color .15s}
+.lbrow.me{border-color:var(--cyan)}
+.lbrank{font-family:var(--fm);font-size:11px;color:var(--muted);width:18px;text-align:center}
+.lbname{flex:1;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.lbpts{font-family:var(--fm);font-size:14px;color:var(--yellow);font-weight:700}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ENDED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#pg-end{align-items:center;justify-content:center;padding:28px}
+.endwrap{display:flex;flex-direction:column;align-items:center;gap:24px;text-align:center;width:100%;max-width:420px}
+.endemo{font-size:70px}
+.endtit{font-family:var(--fd);font-size:68px;letter-spacing:4px;color:var(--yellow)}
+.endsub{color:var(--muted);font-size:15px}
+.finlb{width:100%;background:var(--card);border:1.5px solid var(--b2);border-radius:10px;padding:22px;display:flex;flex-direction:column;gap:8px;text-align:left}
+.finttl{font-family:var(--fm);font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b2);border-radius:4px}
+</style>
+</head>
+<body>
+<div class="bg-wrap"><div class="bg-grid"></div><div class="bg-glow glow-a"></div><div class="bg-glow glow-b"></div></div>
+
+<!-- ① LANDING -->
+<div id="pg-land" class="scr on">
+  <div class="land-wrap" style="position:relative;z-index:1;margin:auto">
+    <div class="logo">
+      <span class="logo-bolt">⚡</span>
+      <h1 class="logo-name">QUIZ<span class="hi">BUZZ</span></h1>
+      <p class="logo-tag">REAL-TIME COMPETITIVE QUIZ ROOMS</p>
+    </div>
+    <div class="role-grid">
+      <div class="rcard">
+        <div class="rcard-ico">🎯</div>
+        <h2>Host a Room</h2>
+        <p>Create a private quiz session, type the correct answer, control the buzzer, and see live scores.</p>
+        <button class="btn by" onclick="pg('pg-setup');setTimeout(()=>g('hname').focus(),80)">Create Room →</button>
+      </div>
+      <div class="rcard">
+        <div class="rcard-ico">🎮</div>
+        <h2>Join a Room</h2>
+        <p>Enter the 6-letter room code your host shared and compete in real time.</p>
+        <div class="join-fields">
+          <input id="jcode" type="text" placeholder="ROOM CODE" maxlength="6" autocomplete="off" spellcheck="false" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"/>
+          <input id="jname" type="text" placeholder="Your name" maxlength="20" autocomplete="off"/>
+          <button class="btn bc full" onclick="joinRoom()">Join Game</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ② HOST SETUP -->
+<div id="pg-setup" class="scr">
+  <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:28px;position:relative;z-index:1">
+    <div class="sbox">
+      <button class="btn bg2 sm" style="align-self:flex-start" onclick="pg('pg-land')">← Back</button>
+      <div><h2 class="stitle">Create Room</h2><p style="color:var(--muted);font-size:14px;margin-top:6px">A 6-letter code will be shared with your players.</p></div>
+      <div>
+        <label class="flabel" for="hname">Your Host Name</label>
+        <input id="hname" type="text" placeholder="e.g. Professor Oak" maxlength="20" autocomplete="off"/>
+      </div>
+      <button class="btn by full" onclick="createRoom()">Generate Room &amp; Start →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ③ HOST DASHBOARD -->
+<div id="pg-host" class="scr">
+  <header class="topbar">
+    <div class="tbrand">⚡ QUIZBUZZ</div>
+    <div class="troom">ROOM:&nbsp;<span class="rchip" id="hchip">——</span><button class="cbtn" onclick="copyCode()" title="Copy code">⧉</button></div>
+    <div class="tright"><button class="btn br sm" onclick="endSession()">End Session</button></div>
+  </header>
+  <div class="hbody">
+    <div class="hleft">
+      <!-- Buzzer -->
+      <div class="card">
+        <div class="clbl">Buzzer Control</div>
+        <div class="bctrl">
+          <button id="mbt" class="mbt" onclick="toggleBuzzer()">
+            <div class="mring"></div>
+            <div class="mcore"><span class="mico">🔒</span><span class="mlbl">LOCKED</span></div>
+          </button>
+          <div id="lpill" class="lpill"><div class="ldot"></div><span id="ltxt">Players cannot buzz in</span></div>
+        </div>
+      </div>
+      <!-- Answer -->
+      <div class="card">
+        <div class="clbl">Correct Answer</div>
+        <textarea id="hans" rows="3" placeholder="Type the correct answer here…" oninput="saveAnswer()"></textarea>
+        <p style="font-family:var(--fm);font-size:11px;color:var(--muted);margin-top:8px">Case-insensitive · Set this before unlocking</p>
+      </div>
+      <!-- Timer -->
+      <div class="card" id="tcard" style="display:none">
+        <div class="clbl">Time Remaining</div>
+        <div class="twrap"><div class="tbox">
+          <svg class="tsvg" viewBox="0 0 100 100"><circle class="ttrack" cx="50" cy="50" r="44"/><circle class="tarc" id="tarc" cx="50" cy="50" r="44" stroke-dasharray="276.46" stroke-dashoffset="0"/></svg>
+          <div class="tnum" id="tnum">30</div>
+        </div></div>
+      </div>
+    </div>
+    <div class="hright">
+      <!-- Players -->
+      <div class="card">
+        <div class="clbl">Players <span class="cbadge" id="hcnt">0</span></div>
+        <div class="plist" id="hplist"><div class="empty">Waiting for players to join…</div></div>
+      </div>
+      <!-- Log -->
+      <div class="card">
+        <div class="clbl">Activity Log</div>
+        <div class="logbox" id="hlog"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ④ PLAYER VIEW -->
+<div id="pg-player" class="scr">
+  <header class="topbar">
+    <div class="tbrand">⚡ QUIZBUZZ</div>
+    <div class="troom">ROOM:&nbsp;<span class="rchip" id="pchip">——</span></div>
+    <div class="sdisp"><span class="slbl">SCORE</span><span class="sval" id="pscore">0</span></div>
+  </header>
+  <div class="pbody">
+    <div class="pmain">
+      <div id="pbanner" class="banner bn-wait"><span class="bn-ico" id="pbico">⏳</span><span id="pbtxt">Waiting for host to unlock the buzzer…</span></div>
+      <div class="buzzzone">
+        <button id="pbuzz" class="buzzbt bz-lock" onclick="playerBuzz()" disabled>
+          <div class="bring"></div><div class="bring"></div>
+          <div class="bcore"><span class="bico">🔒</span><span class="blbl">BUZZER</span><span class="bsub">Locked</span></div>
+        </button>
+      </div>
+      <div id="paform" class="aform" style="display:none">
+        <div class="trow"><span>Time left:</span><span class="tbig" id="ptimer">30</span><span>seconds</span></div>
+        <textarea id="pans" rows="3" placeholder="Type your answer here…" disabled></textarea>
+        <button id="psub" class="btn by full" onclick="submitAnswer()" disabled>Submit Answer</button>
+        <div class="onece">⚠ You only get ONE chance to submit!</div>
+      </div>
+      <div id="pres" class="rescard" style="display:none">
+        <div class="rico" id="prico"></div>
+        <div class="rlbl" id="prlbl"></div>
+        <div class="rmsg" id="prmsg"></div>
+      </div>
+    </div>
+    <div class="pside">
+      <div class="card"><div class="clbl">Leaderboard</div><div class="lbwrap" id="plb"><div class="empty">No players yet</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ⑤ ENDED -->
+<div id="pg-end" class="scr">
+  <div class="endwrap" style="position:relative;z-index:1">
+    <div class="endemo">🏁</div>
+    <h1 class="endtit">GAME OVER</h1>
+    <p class="endsub" id="emsg">The session has ended.</p>
+    <div id="finlb" class="finlb" style="display:none"><div class="finttl">🏆 Final Scores</div><div class="lbwrap" id="finlist"></div></div>
+    <button class="btn by" onclick="location.reload()">← Back to Home</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   QUIZBUZZ — Pure in-memory state, NO Firebase needed
+   Works by sharing a single GAME object in memory.
+   Host and Player open THIS SAME FILE in different tabs.
+   Sync happens via localStorage + storage events.
+══════════════════════════════════════════════════════ */
+
+// ── HELPERS ──────────────────────────────────────────
+const g   = id => document.getElementById(id);
+const esc = s  => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function pg(id){
+  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
+  g(id).classList.add('on');
+}
+
+function toast(msg,dur=3000){
+  const el=g('toast');
+  el.textContent=msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.classList.remove('show'),dur);
+}
+
+function ts(){return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+
+function genCode(){
+  // Simple 6-char alphanumeric, easy to type
+  return Math.random().toString(36).substr(2,6).toUpperCase();
+}
+
+// ── STORAGE KEY ──────────────────────────────────────
+// Room data stored as "QBZ_<CODE>" in localStorage
+const KEY = code => 'QBZ_' + code.toUpperCase();
+
+function readRoom(code){
+  try{
+    const raw = localStorage.getItem(KEY(code));
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+function writeRoom(code, data){
+  try{
+    localStorage.setItem(KEY(code), JSON.stringify(data));
+  }catch(e){ console.error('Storage write failed',e); }
+}
+
+// ── SESSION STATE ────────────────────────────────────
+const ME = {
+  role:null, code:null,
+  pid:null, name:null,
+  score:0,
+  buzzed:false, answered:false,
+  hostTimer:null, playerTimer:null, pollTimer:null,
+};
+
+// ── CREATE ROOM ──────────────────────────────────────
+window.createRoom = function(){
+  const name = g('hname').value.trim();
+  if(!name){ toast('⚠ Enter your host name first'); return; }
+
+  const code = genCode();
+  ME.role = 'host';
+  ME.code = code;
+
+  const room = {
+    code,
+    hostName: name,
+    answer: '',
+    buzzer: { locked:true, who:null },  // who = pid of player who buzzed
+    session: { started:true, ended:false },
+    players: {},   // pid -> { name, score, status }
+    log: []        // activity log entries
+  };
+  writeRoom(code, room);
+
+  g('hchip').textContent = code;
+  pg('pg-host');
+
+  pushLog(code,'Room created — share the code: ' + code,'i');
+  renderHost();
+
+  // Poll for player changes every 400ms
+  ME.pollTimer = setInterval(renderHost, 400);
+};
+
+// ── JOIN ROOM ─────────────────────────────────────────
+window.joinRoom = function(){
+  const rawCode = g('jcode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const name    = g('jname').value.trim();
+
+  // Validation
+  if(!rawCode){    toast('⚠ Enter the room code'); return; }
+  if(rawCode.length !== 6){ toast('⚠ Room code must be 6 characters'); return; }
+  if(!name){       toast('⚠ Enter your name');     return; }
+
+  // Try to find room
+  const room = readRoom(rawCode);
+
+  if(!room){
+    toast('❌ Room "' + rawCode + '" not found — ask your host for the exact code');
+    // Debug helper — list what rooms exist
+    const existing = [];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k && k.startsWith('QBZ_')) existing.push(k.replace('QBZ_',''));
+    }
+    if(existing.length) console.log('Available rooms:', existing);
+    else console.log('No rooms found in localStorage');
+    return;
+  }
+
+  if(room.session && room.session.ended){
+    toast('⚠ This session has already ended');
+    return;
+  }
+
+  // Register player
+  const pid = 'p' + Date.now();
+  ME.role = 'player';
+  ME.code = rawCode;
+  ME.pid  = pid;
+  ME.name = name;
+  ME.score = 0;
+  ME.buzzed = false;
+  ME.answered = false;
+
+  const fresh = readRoom(rawCode);
+  fresh.players[pid] = { name, score:0, status:'waiting' };
+  fresh.log.push({ msg: name + ' joined the room.', type:'i', t:Date.now() });
+  writeRoom(rawCode, fresh);
+
+  g('pchip').textContent = rawCode;
+  pg('pg-player');
+
+  // Listen for storage changes (cross-tab sync)
+  window.addEventListener('storage', onStorageChange);
+
+  // Also poll every 400ms as fallback
+  ME.pollTimer = setInterval(syncPlayer, 400);
+
+  // Tab-leave protection
+  guardLeave(rawCode, pid, name);
+};
+
+// Cross-tab storage event
+function onStorageChange(e){
+  if(e.key === KEY(ME.code)) syncPlayer();
+}
+
+// ── TAB-LEAVE GUARD ───────────────────────────────────
+function guardLeave(code, pid, name){
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='hidden' && ME.role==='player' && !ME.answered){
+      removePlayer(code, pid, name, 'switched tabs');
+    }
+  });
+  window.addEventListener('beforeunload', ()=>{
+    if(ME.role==='player') removePlayer(code, pid, name, 'left the page');
+  });
+}
+
+function removePlayer(code, pid, name, reason){
+  clearTimers();
+  const room = readRoom(code);
+  if(!room) return;
+  if(room.players[pid]) room.players[pid].status = 'left';
+  room.log.push({ msg:'⚠ '+name+' removed ('+reason+').', type:'w', t:Date.now() });
+  writeRoom(code, room);
+  showEnded('You were removed — you ' + reason + '.');
+}
+
+// ── TOGGLE BUZZER (HOST) ──────────────────────────────
+window.toggleBuzzer = function(){
+  const room = readRoom(ME.code);
+  if(!room) return;
+  const wasLocked = room.buzzer.locked;
+  room.buzzer.locked = !wasLocked;
+  room.buzzer.who    = null;
+
+  if(wasLocked){
+    // Opening
+    room.log.push({ msg:'🔓 Buzzer unlocked — 30 seconds!', type:'i', t:Date.now() });
+    writeRoom(ME.code, room);
+    startHostTimer();
+  } else {
+    // Closing
+    room.log.push({ msg:'🔒 Buzzer locked.', type:'i', t:Date.now() });
+    writeRoom(ME.code, room);
+    stopHostTimer();
+    g('tcard').style.display='none';
+  }
+  renderHost();
+};
+
+// ── SAVE ANSWER ───────────────────────────────────────
+window.saveAnswer = function(){
+  const room = readRoom(ME.code);
+  if(!room) return;
+  room.answer = g('hans').value.trim();
+  writeRoom(ME.code, room);
+};
+
+// ── PLAYER BUZZ ───────────────────────────────────────
+window.playerBuzz = function(){
+  if(ME.buzzed || ME.answered) return;
+  const room = readRoom(ME.code);
+  if(!room){ toast('❌ Room not found'); return; }
+  if(room.buzzer.locked)  { toast('🔒 Buzzer is locked!'); return; }
+  if(room.buzzer.who)     { toast('⏸ Someone already buzzed!'); return; }
+
+  ME.buzzed = true;
+  room.buzzer.who    = ME.pid;
+  room.buzzer.locked = true;
+  room.players[ME.pid].status = 'buzzed';
+  room.log.push({ msg:'🔔 '+ME.name+' buzzed in!', type:'a', t:Date.now() });
+  writeRoom(ME.code, room);
+
+  setBanner('bn-buzz','🔔','You buzzed in! Type your answer below.');
+  setBuzz('bz-bz',true,'🔔','BUZZED','Type answer');
+  showAnswerForm();
+};
+
+// ── SUBMIT ANSWER ─────────────────────────────────────
+window.submitAnswer = function(){
+  if(ME.answered) return;
+  ME.answered = true;
+
+  const ans = g('pans').value.trim();
+  g('pans').disabled = true;
+  g('psub').disabled = true;
+  stopPlayerTimer();
+
+  if(!ans){ toast('⚠ Type something first!'); ME.answered=false; return; }
+
+  const room  = readRoom(ME.code);
+  const hAns  = (room ? room.answer : '').toLowerCase().trim();
+  const ok    = ans.toLowerCase().trim() === hAns;
+  const ns    = ok ? ME.score+1 : ME.score;
+  ME.score    = ns;
+
+  const room2 = readRoom(ME.code);
+  if(room2){
+    room2.players[ME.pid] = { ...room2.players[ME.pid], score:ns, status: ok?'correct':'wrong' };
+    room2.buzzer.locked = ok ? true : false;
+    room2.buzzer.who    = null;
+    room2.log.push({
+      msg: ok ? '✅ '+ME.name+' answered correctly! +1' : '❌ '+ME.name+' answered incorrectly.',
+      type: ok?'g':'w', t:Date.now()
+    });
+    writeRoom(ME.code, room2);
+  }
+
+  g('pscore').textContent = ns;
+  showResult(ok, ok ? 'Correct! +1 point' : 'Wrong. Buzzer is back open.');
+};
+
+// ── END SESSION ───────────────────────────────────────
+window.endSession = function(){
+  if(!confirm('End session for all players?')) return;
+  const room = readRoom(ME.code);
+  if(!room) return;
+  room.session.ended = true;
+  room.log.push({ msg:'🏁 Session ended by host.', type:'i', t:Date.now() });
+  writeRoom(ME.code, room);
+  clearTimers();
+  showEnded('You ended the session.');
+};
+
+// ── HOST TIMER ────────────────────────────────────────
+function startHostTimer(){
+  g('tcard').style.display='block';
+  let s=30; setTUI(s); stopHostTimer();
+  ME.hostTimer = setInterval(()=>{
+    s--; setTUI(s);
+    if(s<=0){
+      stopHostTimer(); g('tcard').style.display='none';
+      const r=readRoom(ME.code);
+      if(r){ r.buzzer.locked=true; r.buzzer.who=null; r.log.push({msg:"⏰ Time's up!",type:'w',t:Date.now()}); writeRoom(ME.code,r); }
+      renderHost();
+    }
+  },1000);
+}
+function stopHostTimer(){ if(ME.hostTimer){clearInterval(ME.hostTimer);ME.hostTimer=null;} }
+function setTUI(s){
+  const n=g('tnum'),a=g('tarc'); if(!n)return;
+  n.textContent=s;
+  a.style.strokeDashoffset=(276.46*(1-s/30)).toFixed(2);
+  a.classList.toggle('urg',s<=10);
+}
+
+// ── PLAYER TIMER ──────────────────────────────────────
+function showAnswerForm(){
+  g('paform').style.display='flex';
+  g('pans').disabled=false;
+  g('psub').disabled=false;
+  startPlayerTimer();
+}
+function startPlayerTimer(){
+  let s=30; g('ptimer').textContent=s; stopPlayerTimer();
+  ME.playerTimer = setInterval(()=>{
+    s--; g('ptimer').textContent=s; g('ptimer').classList.toggle('urg',s<=10);
+    if(s<=0){
+      stopPlayerTimer(); g('pans').disabled=true; g('psub').disabled=true;
+      if(!ME.answered){
+        ME.answered=true;
+        const r=readRoom(ME.code);
+        if(r && r.players[ME.pid]){
+          r.players[ME.pid].status='wrong';
+          r.buzzer.locked=false; r.buzzer.who=null;
+          r.log.push({msg:'⏰ '+ME.name+' ran out of time.',type:'w',t:Date.now()});
+          writeRoom(ME.code,r);
+        }
+        showResult(false,'Time ran out!');
+      }
+    }
+  },1000);
+}
+function stopPlayerTimer(){ if(ME.playerTimer){clearInterval(ME.playerTimer);ME.playerTimer=null;} }
+function clearTimers(){ stopHostTimer(); stopPlayerTimer(); if(ME.pollTimer){clearInterval(ME.pollTimer);ME.pollTimer=null;} }
+
+// ── HOST RENDER ───────────────────────────────────────
+function renderHost(){
+  const room = readRoom(ME.code);
+  if(!room) return;
+
+  // Buzzer button
+  const open = !room.buzzer.locked || !!room.buzzer.who;
+  const mb=g('mbt'), pill=g('lpill');
+  mb.classList.toggle('open',open);
+  mb.querySelector('.mico').textContent = open?'🔓':'🔒';
+  mb.querySelector('.mlbl').textContent = open?'OPEN':'LOCKED';
+  pill.classList.toggle('open',open);
+  g('ltxt').textContent = open?'Buzzer is open':'Players cannot buzz in';
+
+  // Players
+  const players = room.players||{};
+  const entries = Object.entries(players);
+  g('hcnt').textContent = entries.filter(([,p])=>p.status!=='left').length;
+
+  const pl = g('hplist');
+  if(!entries.length){
+    pl.innerHTML='<div class="empty">Waiting for players to join…</div>';
+  } else {
+    const mp={
+      waiting: ['','tw','WAITING'],
+      buzzed:  ['sbu','tb','BUZZED IN'],
+      correct: ['sc','tok','CORRECT ✓'],
+      wrong:   ['sw','tx','WRONG ✗'],
+      left:    ['sl','tl','LEFT'],
+    };
+    pl.innerHTML = entries.map(([,p])=>{
+      const [rc,tc,tl] = mp[p.status]||mp.waiting;
+      return `<div class="prow ${rc}">
+        <div class="pav">${esc(p.name.slice(0,2).toUpperCase())}</div>
+        <div class="pinf"><div class="pnm">${esc(p.name)}</div><div class="psc">Score: ${p.score||0}</div></div>
+        <span class="ptag ${tc}">${tl}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Log
+  const logEl = g('hlog');
+  const cm={w:'lw',i:'li2',g:'lg',a:'la'};
+  logEl.innerHTML = [...(room.log||[])].reverse().slice(0,40).map(n=>
+    `<div class="li ${cm[n.type]||''}">[${new Date(n.t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})}] ${esc(n.msg)}</div>`
+  ).join('');
+
+  // Check if session ended externally
+  if(room.session?.ended){ clearTimers(); showEnded('Session ended.'); }
+}
+
+// ── PLAYER SYNC ───────────────────────────────────────
+function syncPlayer(){
+  if(ME.answered) return;
+  const room = readRoom(ME.code);
+  if(!room){ return; }
+  if(room.session?.ended){ clearTimers(); showEnded('The host ended the session.'); return; }
+
+  const buz = room.buzzer||{};
+  const iMe   = buz.who === ME.pid;
+  const other = buz.who && buz.who !== ME.pid;
+
+  // Update score
+  const me = room.players?.[ME.pid];
+  if(me){ ME.score=me.score||0; g('pscore').textContent=ME.score; }
+
+  // Update buzz button state
+  if(!ME.buzzed){
+    if(!buz.locked && !other){
+      setBuzz('bz-rdy',false,'⚡','BUZZ!','Press to answer');
+      setBanner('bn-open','🟢','Buzzer is open — press to buzz in!');
+    } else if(buz.locked && !other){
+      setBuzz('bz-lock',true,'🔒','BUZZER','Locked');
+      setBanner('bn-wait','⏳','Waiting for host to unlock the buzzer…');
+    } else if(other){
+      setBuzz('bz-lock',true,'⏸','WAIT','Other player buzzed');
+      setBanner('bn-wait','⏸','Another player buzzed first…');
+    }
+  }
+
+  // Leaderboard
+  renderLB(room.players||{}, ME.pid);
+}
+
+// ── LEADERBOARD ───────────────────────────────────────
+function renderLB(players, myPid){
+  const sorted = Object.entries(players)
+    .filter(([,p])=>p.status!=='left')
+    .sort(([,a],[,b])=>(b.score||0)-(a.score||0));
+
+  const el = g('plb');
+  if(!el) return;
+  el.innerHTML = sorted.length
+    ? sorted.map(([pid,p],i)=>`
+        <div class="lbrow ${pid===myPid?'me':''}">
+          <span class="lbrank">${i+1}</span>
+          <span class="lbname">${esc(p.name)}${pid===myPid?' (you)':''}</span>
+          <span class="lbpts">${p.score||0}pt</span>
+        </div>`).join('')
+    : '<div class="empty">No players yet</div>';
+}
+
+// ── UI HELPERS ────────────────────────────────────────
+function setBuzz(cls,dis,ic,lb,sb){
+  const b=g('pbuzz');
+  b.className='buzzbt '+cls; b.disabled=dis;
+  b.querySelector('.bico').textContent=ic;
+  b.querySelector('.blbl').textContent=lb;
+  b.querySelector('.bsub').textContent=sb;
+}
+function setBanner(cls,ic,txt){
+  g('pbanner').className='banner '+cls;
+  g('pbico').textContent=ic;
+  g('pbtxt').textContent=txt;
+}
+function showResult(ok,msg){
+  g('paform').style.display='none';
+  const c=g('pres'); c.style.display='flex';
+  c.className='rescard '+(ok?'rok':'rbad');
+  g('prico').textContent=ok?'🎉':'❌';
+  g('prlbl').textContent=ok?'CORRECT!':'INCORRECT'; g('prlbl').className='rlbl '+(ok?'ok':'bad');
+  g('prmsg').textContent=msg||'';
+  setBanner(ok?'bn-ok':'bn-bad',ok?'✅':'❌',ok?'Correct answer! +1 point awarded.':'Wrong answer. Buzzer reopened for others.');
+}
+function pushLog(code,msg,type){
+  const r=readRoom(code); if(!r)return;
+  r.log.push({msg,type,t:Date.now()}); writeRoom(code,r);
+}
+
+// ── ENDED SCREEN ──────────────────────────────────────
+function showEnded(msg){
+  clearTimers();
+  g('emsg').textContent=msg;
+  const room=readRoom(ME.code);
+  if(room){
+    const sorted=Object.entries(room.players||{}).sort(([,a],[,b])=>(b.score||0)-(a.score||0));
+    if(sorted.length){
+      g('finlb').style.display='flex';
+      g('finlist').innerHTML=sorted.map(([,p],i)=>`
+        <div class="lbrow"><span class="lbrank">${i+1}</span><span class="lbname">${esc(p.name)}</span><span class="lbpts">${p.score||0}pt</span></div>`
+      ).join('');
+    }
+  }
+  pg('pg-end');
+}
+
+// ── COPY CODE ─────────────────────────────────────────
+window.copyCode = function(){
+  if(!ME.code) return;
+  navigator.clipboard.writeText(ME.code)
+    .then(()=>toast('✅ Code "'+ME.code+'" copied! Share with players.'))
+    .catch(()=>{ toast('Code: '+ME.code+' — copy it manually!',5000); });
+};
+
+// ── STARTUP CLEANUP ───────────────────────────────────
+// Remove ended rooms older than 2 hours to keep storage clean
+(function cleanup(){
+  try{
+    const now=Date.now();
+    for(let i=localStorage.length-1;i>=0;i--){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith('QBZ_')){
+        const d=JSON.parse(localStorage.getItem(k)||'{}');
+        // Remove if ended or has no recent log activity (>2hr)
+        const lastT=d.log&&d.log.length?d.log[d.log.length-1].t:0;
+        if(d.session&&d.session.ended && (now-lastT)>7200000) localStorage.removeItem(k);
+      }
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
